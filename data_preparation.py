@@ -94,12 +94,6 @@ pretraining_dataset = datasets.load_dataset(
     split="train"
 )
 
-# print(pretraining_dataset)
-# Dataset({
-#     features: ['text', 'meta'],
-#     num_rows: 60000
-# })
-
 # only get the text column
 pretraining_dataset = pretraining_dataset.select_columns(["text"]) # return a full dataset object
 # pretraining_dataset["text"] will only return a raw list of text

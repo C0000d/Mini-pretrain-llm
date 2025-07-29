@@ -49,14 +49,6 @@ tokenizer = AutoTokenizer.from_pretrained(
 )
 
 dataset = dataset.map(tokenization, load_from_cache_file=False) # map calls tokenizer for every row, collect the returned dicts into a brand-new Dataset where new columns.
-# print(dataset)
-#
-# # We can inspect a sample from the dataset
-# sample = dataset[3]
-# print("text", sample["text"][:30])
-# print("input_ids", sample["input_ids"][:30])
-# print("num_tokens", sample["num_tokens"])
-# print("total num of tokens", np.sum(dataset["num_tokens"]))
 
 # Packing the data, GPU friendly
 input_ids = np.concatenate(dataset["input_ids"])   # flatten list-of-lists to 1-D array
@@ -77,9 +69,6 @@ input_ids_reshaped = (
     .reshape(-1, max_seq_length)     # 1-D -> 2-D (num_rows, 32), -1 let numpy infer the first dimension len(input_ids)//32
     .astype(np.int32)                # cast from int64 to int32 to save RAM
 )
-# print(input_ids_reshaped.shape)
-#
-# print("type of input_ids_reshaped: ", type(input_ids_reshaped))
 
 # convert to hugging face dataset
 input_ids_list = input_ids_reshaped.tolist()
