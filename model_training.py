@@ -1,20 +1,20 @@
 import torch
 from transformers import (
     AutoModelForCausalLM,
-    AutoTokenizer,
+    HfArgumentParser,
     Trainer,
     TrainingArguments,
     TrainerCallback,
-    TextStreamer,
 )
-import transformers
+
 import datasets
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, Subset
 from dataclasses import dataclass, field
 
 import warnings
 warnings.filterwarnings("ignore")
 
+EVAL_SIZE = 16  # evaluation dataset split size
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -43,7 +43,7 @@ class CustomDataset(Dataset):
 
 # Training Configs
 @dataclass
-class CustomArguments(transformers.TrainingArguments):
+class CustomArguments(TrainingArguments):
     dataset_name: str = field(
         default="./data/packaged_pretrain_dataset.parquet")       # path / HF name the loader will open
     num_proc: int = field(default=1)                              # number of CPU workers used by datasets for map/tokenization
@@ -88,35 +88,32 @@ class LossLoggingCallback(TrainerCallback):
 # ---------------------------------------------------------------------------
 # 1.A. Load model
 model_path = "./models/TinySolar-308m-4k-init"
-pretrained_model = AutoModelForCausalLM.from_pretrained(
+model_before = AutoModelForCausalLM.from_pretrained(
     model_path,
     device_map="cpu",
     torch_dtype=torch.bfloat16,
     use_cache=False,
 )
-print(pretrained_model)
 
 # ---------------------------------------------------------------------------
 # 2. Training Configs
 # ---------------------------------------------------------------------------
-parser = transformers.HfArgumentParser(CustomArguments)
+parser = HfArgumentParser(CustomArguments)
 args, = parser.parse_args_into_dataclasses(
     args=["--output_dir", "output"]
 )
-training_dataset = CustomDataset(args=args)
-
-print("Input shape: ", training_dataset[0]["input_ids"].shape)
+dataset = CustomDataset(args=args)
+training_dataset = Subset(dataset, range(EVAL_SIZE, len(dataset)))
 
 # ---------------------------------------------------------------------------
 # 3. Run trainer and monitor loss
 # ---------------------------------------------------------------------------
-
 def main():
     # initialise the logger
     loss_logging_callback = LossLoggingCallback()
 
     trainer = Trainer(
-        model=pretrained_model,
+        model=model_before,
         args=args,
         train_dataset=training_dataset,
         eval_dataset=None,
@@ -128,33 +125,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# ---------------------------------------------------------------------------
-# 4. Inference with an intermediate checkpoint
-# ---------------------------------------------------------------------------
-model_name_or_path = "./models/TinySolar-248m-4k"
-tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
-
-model_path = "./output/checkpoint-30"
-model2 = AutoModelForCausalLM.from_pretrained(
-    model_path,
-    device_map="cpu",
-    torch_dtype=torch.bfloat16,
-)
-
-prompt = "I am an engineer. I love"
-
-input = tokenizer(prompt, return_tensors="pt")
-streamer = TextStreamer(
-    model=model2,
-    tokenizer=tokenizer,
-    skip_special_tokens=True,
-)
-outputs = model2.generate(
-    **input,
-    streamer=streamer,
-    use_cache=True,
-    max_new_tokens=64,
-    do_sample=True,
-    temperature=1.0
-)
 

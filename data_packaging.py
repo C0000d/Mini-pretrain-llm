@@ -25,7 +25,6 @@ def tokenization(example):
     example["num_tokens"] = len(tokens_ids)
     return example
 
-
 # ---------------------------------------------------------------------------
 # Data Packaging
 # ---------------------------------------------------------------------------
@@ -52,17 +51,14 @@ dataset = dataset.map(tokenization, load_from_cache_file=False) # map calls toke
 
 # Packing the data, GPU friendly
 input_ids = np.concatenate(dataset["input_ids"])   # flatten list-of-lists to 1-D array
-print("num of tokens before fix length", len(input_ids))
 
 # decoder-only model with a casual-LM loss, you usually feed it fixed-length blocks of tokens
 # clip the tail so the length is a clean multiple of 32
 max_seq_length = 32
 total_length = len(input_ids) - len(input_ids) % max_seq_length
-print("num of tokens after fix length", total_length)
 
 # drop the left-over tokens that don't fit
 input_ids = input_ids[:total_length]
-# print(input_ids.shape)
 
 input_ids_reshaped = (
     input_ids
@@ -75,7 +71,6 @@ input_ids_list = input_ids_reshaped.tolist()
 packaged_pretrain_dataset = datasets.Dataset.from_dict(
     {"input_ids": input_ids_list}
 )
-print(packaged_pretrain_dataset)
 
 # save the packed dataset to disk
 packaged_pretrain_dataset.to_parquet("./data/packaged_pretrain_dataset.parquet")
